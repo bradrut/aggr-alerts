@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import axios, { AxiosResponse } from 'axios';
 
 /**
- * 
+ * An alert that is sent when crypto liquidations cross a given threshold (defined in AGGR built-in script box) 
  */
 interface LiquidationAlert {
-  timestamp: Number;
-  liquidationValue: Number;
+  timestamp: Number;         // Timestamp (milliseconds) that the request was sent from the AGGR app. NOT associated to the time that the liquidation occured.
+  liquidationValue: Number;  // The amount of short or long liquidations that triggered the alert.
+                             // This is the lbuy or lsell value as defined in AGGR. Positive values are lbuy, negative are lsell.
 }
 
 // getting all posts
@@ -36,6 +37,8 @@ const processLiquidationAlert = async (req: Request, res: Response) => {
     // get the data from req.body
     let timestamp: Number = req.body.timestamp;
     let liquidationValue: Number = req.body.liquidationValue;
+
+    console.log("*** Alert received! { timestamp: " + timestamp + ", liquidationValue: " + liquidationValue + " }");
 
     // TODO: Logic to filter out duplicate alerts
 
