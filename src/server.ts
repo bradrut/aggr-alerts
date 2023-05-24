@@ -5,8 +5,13 @@ import http from 'http';
 import express, { Express } from 'express';
 import morgan from 'morgan';
 import routes from './routes/liquidationAlerts';
+import { RedisService } from './services/RedisService';
 
 const router: Express = express();
+
+/** Connect to Redis */
+const redisService = new RedisService();
+redisService.setup();
 
 /** Logging */
 router.use(morgan('dev'));
@@ -44,3 +49,6 @@ router.use((req, res, next) => {
 const httpServer = http.createServer(router);
 const PORT: any = process.env.PORT ?? 6060;
 httpServer.listen(PORT, () => console.log(`The server is running on port ${PORT}`));
+
+/** Exports */
+export default redisService;

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import axios, { AxiosResponse } from 'axios';
+import redisClient from '../server';
 
 /**
  * An alert that is sent when crypto liquidations cross a given threshold (defined in AGGR built-in script box) 
@@ -41,6 +41,7 @@ const processLiquidationAlert = async (req: Request, res: Response) => {
     console.log("*** Alert received! { timestamp: " + timestamp + ", liquidationValue: " + liquidationValue + " }");
 
     // TODO: Logic to filter out duplicate alerts
+    console.log(await redisClient.test());
 
     // If the request is not a duplicate, send Telegram notification
     // let response: AxiosResponse = await axios.post(`https://jsonplaceholder.typicode.com/posts`, {

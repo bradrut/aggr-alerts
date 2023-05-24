@@ -1,7 +1,7 @@
 import express from 'express';
-import controller from '../controllers/liquidationAlerts';
+import LiquidationAlertsController from '../controllers/liquidationAlerts';
 const router = express.Router();
 
-router.post('/liquidationAlerts', controller.processLiquidationAlert);
+router.post('/liquidationAlerts', LiquidationAlertsController.processLiquidationAlert);
 
 export = router;
