@@ -1,12 +1,16 @@
-import { Request, Response } from 'express';
-import redisClient from '../server';
+import { NextFunction, Request, Response } from 'express';
+import redisService from '../server';
+import { sendTelegramAlertMessage } from '../services/telegramService';
+import { Logger } from 'pino';
+
+const logger: Logger = require('pino')()
 
 /**
  * An alert that is sent when crypto liquidations cross a given threshold (defined in AGGR built-in script box) 
  */
 interface LiquidationAlert {
-  timestamp: Number;         // Timestamp (milliseconds) that the request was sent from the AGGR app. NOT associated to the time that the liquidation occured.
-  liquidationValue: Number;  // The amount of short or long liquidations that triggered the alert.
+  timestamp: number;         // Timestamp (milliseconds) that the request was sent from the AGGR app. NOT associated to the time that the liquidation occured.
+  liquidationValue: number;  // The amount of short or long liquidations that triggered the alert.
                              // This is the lbuy or lsell value as defined in AGGR. Positive values are lbuy, negative are lsell.
 }
 
@@ -33,24 +37,38 @@ interface LiquidationAlert {
 // };
 
 // 
-const processLiquidationAlert = async (req: Request, res: Response) => {
+const processLiquidationAlert = async (req: Request, res: Response, next: NextFunction) => {
     // get the data from req.body
-    let timestamp: Number = req.body.timestamp;
-    let liquidationValue: Number = req.body.liquidationValue;
+    // Because of CORS issues when *manually setting* 'Content-Type' header from AGGR script box (but no issues
+    // when leaving 'Content-Type' as default 'text/plain'), manually parse 'text/plain' requests here.
+    let body: LiquidationAlert = req.body;
+    let contentType = req.headers['content-type'];
+    if (contentType && contentType.includes('text/plain')) {
+      body = JSON.parse(req.body);
+    } else if (!contentType) {
+      return next(new Error("Unexpected condition: could not find content-type header in request"));
+    }
 
-    console.log("*** Alert received! { timestamp: " + timestamp + ", liquidationValue: " + liquidationValue + " }");
+    let liquidationValue: number = body.liquidationValue;
+    logger.info("liquidationValue: " + liquidationValue);
 
-    // TODO: Logic to filter out duplicate alerts
-    console.log(await redisClient.test());
+    try {
+      if (await redisService.getCachedLiquidation(liquidationValue)) {
+        // Duplicate request; do nothing and return a 409 Conflict
+        logger.info("Sending 409 CONFLICT response to client");
+        return res.status(409).json('An alert has already been processed for this liquidation');
+      }
 
-    // If the request is not a duplicate, send Telegram notification
-    // let response: AxiosResponse = await axios.post(`https://jsonplaceholder.typicode.com/posts`, {
-    //     title,
-    //     body
-    // });
+      // If the request is not a duplicate, create a cached record and send the Telegram notification
+      await redisService.setCachedLiquidation(liquidationValue);
+      await sendTelegramAlertMessage(liquidationValue);
+    } catch (err) {
+      return next(err);
+    }
 
     // Return response. No response body because AGGR script box cannot await to handle the response anyway
-    return res.status(200).json({});
+    logger.info("Sending 200 SUCCESS response to client");
+    return res.status(200).json("Telegram notification has been sent");
 };
 
 export default { processLiquidationAlert };

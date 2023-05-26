@@ -8,6 +8,8 @@ import routes from './routes/liquidationAlerts';
 import { RedisService } from './services/RedisService';
 
 const router: Express = express();
+router.use(express.text());
+router.use(express.json());
 
 /** Connect to Redis */
 const redisService = new RedisService();
@@ -28,8 +30,8 @@ router.use((req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'origin, X-Requested-With,Content-Type,Accept, Authorization');
   // set the CORS method headers
   if (req.method === 'OPTIONS') {
-      res.header('Access-Control-Allow-Methods', 'GET PATCH DELETE POST');
-      return res.status(200).json({});
+    res.header('Access-Control-Allow-Methods', 'GET PATCH DELETE POST');
+    return res.status(200).json({});
   }
   next();
 });
