@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import redisService from '../server';
-import { sendTelegramAlertMessage } from '../services/telegramService';
+import redisService, { telegramService } from '../server';
 import { Logger } from 'pino';
 
 const logger: Logger = require('pino')()
@@ -9,7 +8,8 @@ const logger: Logger = require('pino')()
  * An alert that is sent when crypto liquidations cross a given threshold (defined in AGGR built-in script box) 
  */
 interface LiquidationAlert {
-  timestamp: number;         // Timestamp (milliseconds) that the request was sent from the AGGR app. NOT associated to the time that the liquidation occured.
+  buyThreshold: number;
+  sellThreshold: number;
   liquidationValue: number;  // The amount of short or long liquidations that triggered the alert.
                              // This is the lbuy or lsell value as defined in AGGR. Positive values are lbuy, negative are lsell.
 }
@@ -49,8 +49,9 @@ const processLiquidationAlert = async (req: Request, res: Response, next: NextFu
       return next(new Error("Unexpected condition: could not find content-type header in request"));
     }
 
+    let buyThreshold: number = body.buyThreshold;
+    let sellThreshold: number = body.sellThreshold;
     let liquidationValue: number = body.liquidationValue;
-    logger.info("liquidationValue: " + liquidationValue);
 
     try {
       if (await redisService.getCachedLiquidation(liquidationValue)) {
@@ -61,7 +62,7 @@ const processLiquidationAlert = async (req: Request, res: Response, next: NextFu
 
       // If the request is not a duplicate, create a cached record and send the Telegram notification
       await redisService.setCachedLiquidation(liquidationValue);
-      await sendTelegramAlertMessage(liquidationValue);
+      await telegramService.sendTelegramAlertMessage(liquidationValue < 0 ? sellThreshold : buyThreshold, liquidationValue);
     } catch (err) {
       return next(err);
     }

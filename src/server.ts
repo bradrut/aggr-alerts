@@ -4,8 +4,10 @@ dotenv.config()
 import http from 'http';
 import express, { Express } from 'express';
 import morgan from 'morgan';
+
 import routes from './routes/liquidationAlerts';
 import { RedisService } from './services/RedisService';
+import { TelegramService } from './services/TelegramService';
 
 const router: Express = express();
 router.use(express.text());
@@ -51,6 +53,9 @@ router.use((req, res, next) => {
 const httpServer = http.createServer(router);
 const PORT: any = process.env.PORT ?? 6060;
 httpServer.listen(PORT, () => console.log(`The server is running on port ${PORT}`));
+
+/** Telegram Bot */
+export const telegramService = new TelegramService();
 
 /** Exports */
 export default redisService;
