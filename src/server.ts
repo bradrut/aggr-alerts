@@ -5,15 +5,10 @@ import http from 'http';
 import express, { Express } from 'express';
 import morgan from 'morgan';
 
+// IMPORTANT: Must export dependencies before importing routes, since ./routes/liquidationAlerts uses the controller dependency
+export * from './dependencies';
 import routes from './routes/liquidationAlerts';
-import { RedisService } from './services/RedisService';
-import { TelegramService } from './services/TelegramService';
-import { LiquidationAlertsController } from './controllers/LiquidationAlertsController';
 
-
-/*************************************
- * Server setup
- *************************************/
 
 const router: Express = express();
 router.use(express.text());
@@ -55,18 +50,3 @@ router.use((req, res, next) => {
 const httpServer = http.createServer(router);
 const PORT: any = process.env.PORT ?? 6060;
 httpServer.listen(PORT, () => console.log(`The server is running on port ${PORT}`));
-
-
-/*************************************
- * Dependencies setup
- *************************************/
-
-/** Setup and connect to Redis */
-export const redisService = new RedisService();
-redisService.setup();
-
-/** Telegram Bot dependency */
-export const telegramService = new TelegramService();
-
-/** Instantiate LiquidationAlertsController */
-export const liquidationAlertsController = new LiquidationAlertsController();

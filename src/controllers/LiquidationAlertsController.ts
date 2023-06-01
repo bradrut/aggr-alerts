@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { redisService, telegramService } from '../server';
 import { Logger } from 'pino';
+import { LiquidationAlertsService } from '../services/LiquidationAlertsService';
 
 const logger: Logger = require('pino')()
 
@@ -16,14 +17,16 @@ interface LiquidationAlert {
 
 export class LiquidationAlertsController {
 
-  private static buyThreshold: number = -1;
-  private static sellThreshold: number = -1;
-  private static pauseAlerts: boolean = false; // Flag used to ensure that an alert only gets sent once per crossing of the threshold
+  private alertsService: LiquidationAlertsService;
+
+  constructor() {
+    this.alertsService = new LiquidationAlertsService();
+  }
 
   /**
    * Handler function for POST /liquidationAlerts
    */
-  public static async processLiquidationAlert(req: Request, res: Response, next: NextFunction) {
+  public async processLiquidationAlert(req: Request, res: Response, next: NextFunction) {
     // Get the data from req.body
     // Because of CORS issues when *manually setting* 'Content-Type' header from AGGR script box (but no issues
     // when leaving 'Content-Type' as default 'text/plain'), manually parse 'text/plain' requests here.
@@ -35,10 +38,10 @@ export class LiquidationAlertsController {
       return next(new Error("Unexpected condition: could not find content-type header in request"));
     }
 
-    this.setThresholds(body.buyThreshold, body.sellThreshold);
+    this.alertsService.setThresholds(body.buyThreshold, body.sellThreshold);
     let liquidationValue: number = body.liquidationValue;
 
-    if (!this.alertsArePaused(liquidationValue)) {
+    if (!this.alertsService.alertsArePaused(liquidationValue)) {
       try {
         if (await redisService.getCachedLiquidation(liquidationValue)) {
           // Duplicate request; do nothing and return a 409 Conflict
@@ -48,7 +51,8 @@ export class LiquidationAlertsController {
 
         // If the request is not a duplicate, create a cached record and send the Telegram notification
         await redisService.setCachedLiquidation(liquidationValue);
-        await telegramService.sendTelegramAlertMessage(this.liquidationIsSell(liquidationValue) ? this.sellThreshold : this.buyThreshold, liquidationValue);
+        await telegramService.sendTelegramAlertMessage(this.alertsService.liquidationIsSell(liquidationValue) ? this.alertsService.getSellThreshold() : this.alertsService.getBuyThreshold(),
+                                                       liquidationValue);
       } catch (err) {
         return next(err);
       }
@@ -59,32 +63,11 @@ export class LiquidationAlertsController {
     }
 
     // Since a Telegram alert has successfully been sent, pause further alerts until the threshold has been un-crossed
-    this.pauseAlerts = true;
+    this.alertsService.setPauseAlerts(true);
 
     // Return response. No response body because AGGR script box cannot await to handle the response anyway
     logger.info("Sending 200 SUCCESS response to client");
     return res.status(200).json("Telegram notification has been sent");
   };
-
-  private static setThresholds(buyThreshold: number, sellThreshold: number) {
-    this.buyThreshold = buyThreshold;
-    this.sellThreshold = sellThreshold;
-  }
-
-  private static alertsArePaused(liquidationValue: number) {
-    // If the current lbuy or lsell value is below the thresholds, unpause alerts if they were paused
-    if ((liquidationValue < this.buyThreshold) && (liquidationValue > this.sellThreshold)) {
-      this.pauseAlerts = false;
-    }
-    return this.alertsArePaused;
-  }
-
-  private static liquidationIsBuy(liquidationValue: number) {
-    return liquidationValue > 0;
-  }
-
-  private static liquidationIsSell(liquidationValue: number) {
-    return liquidationValue < 0;
-  }
 
 }

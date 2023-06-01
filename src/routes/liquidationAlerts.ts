@@ -1,8 +1,7 @@
 import express from 'express';
-import { LiquidationAlertsController } from '../controllers/LiquidationAlertsController';
+import { liquidationAlertsController } from '../server';
 
 const router = express.Router();
+router.post('/liquidationAlerts', liquidationAlertsController.processLiquidationAlert);
 
-router.post('/liquidationAlerts', LiquidationAlertsController.processLiquidationAlert);
-
-export = router;
+export default router;
