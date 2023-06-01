@@ -3,7 +3,7 @@ import { redisService, telegramService } from '../server';
 import { Logger } from 'pino';
 import { LiquidationAlertsService } from '../services/LiquidationAlertsService';
 
-const logger: Logger = require('pino')()
+const logger: Logger = require('pino')();
 
 /**
  * An alert that is sent when crypto liquidations cross a given threshold (defined in AGGR built-in script box) 
@@ -26,7 +26,7 @@ export class LiquidationAlertsController {
   /**
    * Handler function for POST /liquidationAlerts
    */
-  public async processLiquidationAlert(req: Request, res: Response, next: NextFunction) {
+  public processLiquidationAlert = async (req: Request, res: Response, next: NextFunction) => {
     // Get the data from req.body
     // Because of CORS issues when *manually setting* 'Content-Type' header from AGGR script box (but no issues
     // when leaving 'Content-Type' as default 'text/plain'), manually parse 'text/plain' requests here.
@@ -58,7 +58,7 @@ export class LiquidationAlertsController {
       }
     } else {
       // Alerts are paused because an alert has already been sent for this threshold crossing
-      logger.info("Sending 100 CONTINUE response to client");
+      logger.info("An alert has already been processed for this threshold crossing; sending 100 CONTINUE response to client");
       return res.status(100).json('An alert has already been processed for this threshold crossing');
     }
 

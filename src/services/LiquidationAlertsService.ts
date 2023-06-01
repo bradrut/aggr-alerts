@@ -1,5 +1,7 @@
 import { Logger } from 'pino';
 
+const logger: Logger = require('pino')();
+
 export class LiquidationAlertsService {
 
   private buyThreshold: number;
@@ -29,12 +31,14 @@ export class LiquidationAlertsService {
   public alertsArePaused(liquidationValue: number): boolean {
     // If the current lbuy or lsell value is below the thresholds, unpause alerts
     if ((liquidationValue < this.buyThreshold) && (liquidationValue > this.sellThreshold)) {
+      logger.debug('Resetting pauseAlerts to false because lbuy or lsell has fallen back below the threshold');
       this.pauseAlerts = false;
     }
     return this.pauseAlerts;
   }
 
   public setPauseAlerts(pauseAlerts: boolean): void {
+    logger.debug('Setting pauseAlerts to " + pauseAlerts');
     this.pauseAlerts = pauseAlerts;
   }
 
