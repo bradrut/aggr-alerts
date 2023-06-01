@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from 'express';
-import { redisService, telegramService } from '../server';
 import { Logger } from 'pino';
+
 import { LiquidationAlertsService } from '../services/LiquidationAlertsService';
+import { ApiError } from '../types/ApiError';
 
 const logger: Logger = require('pino')();
 
@@ -38,35 +39,22 @@ export class LiquidationAlertsController {
       return next(new Error("Unexpected condition: could not find content-type header in request"));
     }
 
-    this.alertsService.setThresholds(body.buyThreshold, body.sellThreshold);
     let liquidationValue: number = body.liquidationValue;
+    let buyThreshold = body.buyThreshold;
+    let sellThreshold = body.sellThreshold;
 
-    if (!this.alertsService.alertsArePaused(liquidationValue)
-        && ((liquidationValue > this.alertsService.getBuyThreshold()) || (liquidationValue < this.alertsService.getSellThreshold()))) {
-      try {
-        if (await redisService.getCachedLiquidation(liquidationValue)) {
-          // Duplicate request; do nothing and return a 409 Conflict
-          logger.info("Sending 409 CONFLICT response to client");
-          return res.status(409).json('An alert has already been processed for this liquidation');
-        }
-
-        // If the request is not a duplicate, create a cached record and send the Telegram notification
-        await redisService.setCachedLiquidation(liquidationValue);
-        await telegramService.sendTelegramAlertMessage(this.alertsService.liquidationIsSell(liquidationValue) ? this.alertsService.getSellThreshold() : this.alertsService.getBuyThreshold(),
-                                                       liquidationValue);
-      } catch (err) {
-        return next(err);
+    try {
+      await this.alertsService.processLiquidationAlert(buyThreshold, sellThreshold, liquidationValue);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        let apiError = err as ApiError;
+        return res.status(apiError.httpStatus).json(apiError.message);
+      } else {
+        next(err);
       }
-    } else {
-      // Alerts are paused because an alert has already been sent for this threshold crossing
-      logger.info("An alert has already been processed for this threshold crossing; sending 100 CONTINUE response to client");
-      return res.status(100).json('An alert has already been processed for this threshold crossing');
     }
 
-    // Since a Telegram alert has successfully been sent, pause further alerts until the threshold has been un-crossed
-    this.alertsService.setPauseAlerts(true);
-
-    // Return response. No response body because AGGR script box cannot await to handle the response anyway
+    // Return success response
     logger.info("Telegram notification has been sent for liquidationValue: " + liquidationValue + "; sending 200 SUCCESS response to client");
     return res.status(200).json("Telegram notification has been sent");
   };

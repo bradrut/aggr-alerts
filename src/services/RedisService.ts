@@ -32,7 +32,7 @@ export class RedisService {
       logger.error(liquidationValue, "Could not set cached liquidation becaues liquidationValue is zero or undefined");
       throw new Error("Could not set cached liquidation becaues liquidationValue is zero or undefined");
     }
-    logger.debug("Setting cached liquidation for liquidationValue: " + liquidationValue);
+    logger.debug("Caching liquidationValue: " + liquidationValue);
     return await this.redisClient.set(liquidationValue.toString(), liquidationValue.toString(), { EX: REDIS_EX_TTL });
   }
 
