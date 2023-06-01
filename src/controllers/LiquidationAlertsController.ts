@@ -41,7 +41,8 @@ export class LiquidationAlertsController {
     this.alertsService.setThresholds(body.buyThreshold, body.sellThreshold);
     let liquidationValue: number = body.liquidationValue;
 
-    if (!this.alertsService.alertsArePaused(liquidationValue)) {
+    if (!this.alertsService.alertsArePaused(liquidationValue)
+        && ((liquidationValue > this.alertsService.getBuyThreshold()) || (liquidationValue < this.alertsService.getSellThreshold()))) {
       try {
         if (await redisService.getCachedLiquidation(liquidationValue)) {
           // Duplicate request; do nothing and return a 409 Conflict
@@ -66,7 +67,7 @@ export class LiquidationAlertsController {
     this.alertsService.setPauseAlerts(true);
 
     // Return response. No response body because AGGR script box cannot await to handle the response anyway
-    logger.info("Sending 200 SUCCESS response to client");
+    logger.info("Telegram notification has been sent for liquidationValue: " + liquidationValue + "; sending 200 SUCCESS response to client");
     return res.status(200).json("Telegram notification has been sent");
   };
 
