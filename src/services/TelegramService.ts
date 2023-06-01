@@ -37,8 +37,9 @@ export class TelegramService {
 
   setupBotHandlers(bot: Bot) {
     //This function would be added to the dispatcher as a handler for messages coming from the Bot API
-    this.bot.on("message", async (ctx) => {
-      this.bot.api.sendMessage(this.chatId, "Sorry, I am not programmed to handle incoming messages.\nIf you'd like a custom feature added, please contact Brad at:\nrutkowski.bradley@gmail.com");
+    this.bot.on("channel_post", async (ctx) => {
+      this.bot.api.sendMessage(this.chatId,
+                               "Sorry, I am not programmed to handle incoming messages.\nIf you'd like a custom feature added, please contact Brad at:\nrutkowski.bradley@gmail.com");
     });
   }
 
