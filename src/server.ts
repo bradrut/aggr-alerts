@@ -8,14 +8,16 @@ import morgan from 'morgan';
 import routes from './routes/liquidationAlerts';
 import { RedisService } from './services/RedisService';
 import { TelegramService } from './services/TelegramService';
+import { LiquidationAlertsController } from './controllers/LiquidationAlertsController';
+
+
+/*************************************
+ * Server setup
+ *************************************/
 
 const router: Express = express();
 router.use(express.text());
 router.use(express.json());
-
-/** Connect to Redis */
-const redisService = new RedisService();
-redisService.setup();
 
 /** Logging */
 router.use(morgan('dev'));
@@ -54,8 +56,17 @@ const httpServer = http.createServer(router);
 const PORT: any = process.env.PORT ?? 6060;
 httpServer.listen(PORT, () => console.log(`The server is running on port ${PORT}`));
 
-/** Telegram Bot */
+
+/*************************************
+ * Dependencies setup
+ *************************************/
+
+/** Setup and connect to Redis */
+export const redisService = new RedisService();
+redisService.setup();
+
+/** Telegram Bot dependency */
 export const telegramService = new TelegramService();
 
-/** Exports */
-export default redisService;
+/** Instantiate LiquidationAlertsController */
+export const liquidationAlertsController = new LiquidationAlertsController();
