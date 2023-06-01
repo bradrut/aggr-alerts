@@ -45,6 +45,8 @@ export class TelegramService {
 
   async sendTelegramAlertMessage(surpassedThreshold: number, liquidationValue: number): Promise<Message.TextMessage> {
     logger.info("Sending Telegram notification for liquidationValue: " + liquidationValue);
-    return this.bot.api.sendMessage(this.chatId, "AGGR has reported a liquidation of:\n" + liquidationValue + "\n\nwhich surpassed your alert threshold of " + surpassedThreshold + ".");
+    return this.bot.api.sendMessage(this.chatId,
+                                    "AGGR has reported a liquidation of:\n<b>" + liquidationValue + "</b>\n\nwhich surpassed your alert threshold of " + surpassedThreshold + ".",
+                                    { parse_mode: 'HTML' });
   }
 }
