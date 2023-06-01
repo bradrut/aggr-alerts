@@ -20,7 +20,18 @@ export class LiquidationAlertsService {
     this.pausedAt = -1;
   }
 
+  /**
+   * Sends a Telegram alert if the liquidationValue is not a duplicate, if it has surpassed the provided
+   * thresholds, and if alerts are not currently paused. Note that ALL liquidationValues that surpass the
+   * specified thresholds are cached, regardless of whether a Telegram notification is sent.
+   */
   public async processLiquidationAlert(buyThreshold: number, sellThreshold: number, liquidationValue: number): Promise<void> {
+    if (await this.liquidationValueIsDuplicate(liquidationValue)) {
+      // Duplicate request; do nothing and return a 409 Conflict
+      logger.info('An alert has already been processed for liquidationValue: ' + liquidationValue);
+      throw new ApiError(HTTP_STATUS.CONFLICT, 'An alert has already been processed for this liquidation');
+    }
+
     // Note that the liquidationSurpassedThreshold() function updates the threshold fields on the alertsService
     if (this.liquidationSurpassedThreshold(buyThreshold, sellThreshold, liquidationValue)) {
       // Cache ALL liquidationValues that have surpassed the thresholds, even if alerts are paused, so that
@@ -29,20 +40,14 @@ export class LiquidationAlertsService {
       await redisService.setCachedLiquidation(liquidationValue);
     } else {
       // This liquidationValue has not surpassed the alertThresholds. Do nothing and return a 204 NO CONTENT.
-      logger.info('liquidationValue: ' + liquidationValue + ' has not surpassed the provided alert thresholds; sending 204 NO CONTENT response to client');
-      throw new ApiError(HTTP_STATUS.NO_CONTENT, 'The liquidation has not surpassed the specified thresholds. No alert necessary.');
+      logger.info('liquidationValue: ' + liquidationValue + ' has not surpassed the provided alert thresholds');
+      throw new ApiError(HTTP_STATUS.OK, 'The liquidation has not surpassed the specified thresholds. No alert necessary.');
     }
 
     if (this.alertsArePaused(liquidationValue)) {
       // Alerts are paused because an alert has already been sent for this threshold crossing
-      logger.info("An alert has already been processed for this threshold crossing; sending 204 NO CONTENT response to client");
-      throw new ApiError(HTTP_STATUS.NO_CONTENT, 'An alert has already been processed for this threshold crossing');
-    }
-
-    if (await this.liquidationValueIsDuplicate(liquidationValue)) {
-      // Duplicate request; do nothing and return a 409 Conflict
-      logger.info('An alert has already been processed for liquidationValue: ' + liquidationValue + '; sending 409 CONFLICT response to client');
-      throw new ApiError(HTTP_STATUS.CONFLICT, 'An alert has already been processed for this liquidation');
+      logger.info("An alert has already been processed for this threshold crossing");
+      throw new ApiError(HTTP_STATUS.OK, 'An alert has already been processed for this threshold crossing.');
     }
 
     // The request has passed all criteria to trigger an alert, so send alert via the telegramService
@@ -58,7 +63,7 @@ export class LiquidationAlertsService {
    * @param liquidationValue The liquidationValue that has been sent from the client. Resets the pauseAlerts flag if the liquidationValue has dropped back in between the thresholds.
    * @returns The value of the pauseAlerts flag
    */
-  public alertsArePaused(liquidationValue: number): boolean {
+  private alertsArePaused(liquidationValue: number): boolean {
     // If alerts are paused, determine if they should be unpaused
     if (this.pauseAlerts) {
       // If the current liquidationValue is below both thresholds or it's been 3mins since the last alert, unpause alerts
@@ -72,13 +77,13 @@ export class LiquidationAlertsService {
     return this.pauseAlerts;
   }
 
-  public setPauseAlerts(pauseAlerts: boolean): void {
+  private setPauseAlerts(pauseAlerts: boolean): void {
     logger.debug('Setting pauseAlerts to ' + pauseAlerts + '. Alerts above the threshold will still be cached to avoid future duplicates.');
     this.pausedAt = new Date().getTime() / 1000; // Current time in seconds
     this.pauseAlerts = pauseAlerts;
   }
 
-  public async liquidationValueIsDuplicate(liquidationValue: number): Promise<boolean> {
+  private async liquidationValueIsDuplicate(liquidationValue: number): Promise<boolean> {
     let cachedLiquidation: string | null = await redisService.getCachedLiquidation(liquidationValue);
     return cachedLiquidation !== null;
   }
