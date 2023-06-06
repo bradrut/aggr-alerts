@@ -1,0 +1,7 @@
+services:
+  aggr-telegram-service:
+    build: ./aggr-telegram-service    # Builds from Dockerfile in this specified directory
+    ports:
+      - "3000:3000"                   # Host:app
+  redis:
+    build: ./aggr-redis               # Builds from Dockerfile in this specified directory
