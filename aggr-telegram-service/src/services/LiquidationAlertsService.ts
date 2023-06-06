@@ -26,25 +26,32 @@ export class LiquidationAlertsService {
    * specified thresholds are cached, regardless of whether a Telegram notification is sent.
    */
   public async processLiquidationAlert(buyThreshold: number, sellThreshold: number, liquidationValue: number): Promise<void> {
+    this.setThresholds(buyThreshold, sellThreshold);
+    this.tryUnpauseAlerts(buyThreshold, sellThreshold, liquidationValue);
+
+    if (!liquidationValue) {
+      logger.info("Not processing notification becaues liquidationValue is zero or undefined");
+      throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Not processing notification becaues liquidationValue is zero or undefined");
+    }
+
     if (await this.liquidationValueIsDuplicate(liquidationValue)) {
       // Duplicate request; do nothing and return a 409 Conflict
       logger.info('An alert has already been processed for liquidationValue: ' + liquidationValue);
       throw new ApiError(HTTP_STATUS.CONFLICT, 'An alert has already been processed for this liquidation');
     }
 
-    // Note that the liquidationSurpassedThreshold() function updates the threshold fields on the alertsService
-    if (this.liquidationSurpassedThreshold(buyThreshold, sellThreshold, liquidationValue)) {
-      // Cache ALL liquidationValues that have surpassed the thresholds, even if alerts are paused, so that
-      // we do not send duplicate or old alerts when the AGGR script box refreshes.
-      // Note for debugging purposes that if this is overwriting an existing cached value, the TTL will be reset.
-      await redisService.setCachedLiquidation(liquidationValue);
-    } else {
+    // Cache ALL nonzero liquidationValues, even if alerts are paused, so that we do not send duplicate
+    // or old alerts when the AGGR script box refreshes.
+    // Note for debugging purposes that if this is overwriting an existing cached value, the TTL will be reset.
+    await redisService.setCachedLiquidation(liquidationValue);
+
+    if (! this.liquidationSurpassedThreshold(buyThreshold, sellThreshold, liquidationValue)) {
       // This liquidationValue has not surpassed the alertThresholds. Do nothing and return a 204 NO CONTENT.
       logger.info('liquidationValue: ' + liquidationValue + ' has not surpassed the provided alert thresholds');
       throw new ApiError(HTTP_STATUS.OK, 'The liquidation has not surpassed the specified thresholds. No alert necessary.');
     }
 
-    if (this.alertsArePaused(liquidationValue)) {
+    if (this.pauseAlerts) {
       // Alerts are paused because an alert has already been sent for this threshold crossing
       logger.info("An alert has already been processed for this threshold crossing");
       throw new ApiError(HTTP_STATUS.OK, 'An alert has already been processed for this threshold crossing.');
@@ -59,28 +66,22 @@ export class LiquidationAlertsService {
   }
 
   /**
-   * Reset the pauseAlerts flag based on the liquidationValue if necessary, and return the current value of the flag.
+   * If alerts are paused, check if they should be unpaused based on the thresholds, liquidationValue, and
+   * time of last pause, and return the current value of the flag.
+   * 
    * @param liquidationValue The liquidationValue that has been sent from the client. Resets the pauseAlerts flag if the liquidationValue has dropped back in between the thresholds.
    * @returns The value of the pauseAlerts flag
    */
-  private alertsArePaused(liquidationValue: number): boolean {
-    // If alerts are paused, determine if they should be unpaused
+  private tryUnpauseAlerts(buyThreshold: number, sellThreshold: number, liquidationValue: number): boolean {
     if (this.pauseAlerts) {
       // If the current liquidationValue is below both thresholds or it's been 3mins since the last alert, unpause alerts
       let currTimeSecs = new Date().getTime() / 1000;
-      if (((liquidationValue < this.buyThreshold) && (liquidationValue > this.sellThreshold))
-            || currTimeSecs-this.pausedAt > 180) {
+      if (!this.liquidationSurpassedThreshold(buyThreshold, sellThreshold, liquidationValue) || currTimeSecs-this.pausedAt > 180) {
         logger.debug('Resetting pauseAlerts to false');
         this.pauseAlerts = false;
       }
     }
     return this.pauseAlerts;
-  }
-
-  private setPauseAlerts(pauseAlerts: boolean): void {
-    logger.debug('Setting pauseAlerts to ' + pauseAlerts + '. Alerts above the threshold will still be cached to avoid future duplicates.');
-    this.pausedAt = new Date().getTime() / 1000; // Current time in seconds
-    this.pauseAlerts = pauseAlerts;
   }
 
   private async liquidationValueIsDuplicate(liquidationValue: number): Promise<boolean> {
@@ -96,8 +97,13 @@ export class LiquidationAlertsService {
    * Updates this class's threshold fields with the provided values, and returns whether those thresholds have been surpassed
    */
   public liquidationSurpassedThreshold(buyThreshold: number, sellThreshold: number, liquidationValue: number) {
-    this.setThresholds(buyThreshold, sellThreshold);
-    return (liquidationValue > buyThreshold) || (liquidationValue < sellThreshold);
+    return (liquidationValue >= buyThreshold) || (liquidationValue <= sellThreshold);
+  }
+
+  private setPauseAlerts(pauseAlerts: boolean): void {
+    logger.debug('Setting pauseAlerts to ' + pauseAlerts + '. Alerts above the threshold will still be cached to avoid future duplicates.');
+    this.pausedAt = new Date().getTime() / 1000; // Current time in seconds
+    this.pauseAlerts = pauseAlerts;
   }
 
   public setThresholds(buyThreshold: number, sellThreshold: number): void {
