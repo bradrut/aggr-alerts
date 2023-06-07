@@ -7,7 +7,7 @@ services:
       - "3000:80"                     # Host:App
   aggr-redis:
     build: ./aggr-redis
-    image: bradrut/aggr-redi:1.0.0
+    image: bradrut/aggr-redis:1.0.0
     ports:
       - "6379:6379"
   aggr-telegram-service:
