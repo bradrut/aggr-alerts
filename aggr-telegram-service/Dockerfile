@@ -9,4 +9,4 @@ RUN npm install -g typescript@latest
 COPY . .
 RUN tsc
 CMD ["node", "build/server.js"]
-EXPOSE 3000
+EXPOSE 3001

@@ -1,9 +1,21 @@
+version: '1.0'
 services:
-  aggr-telegram-service:
-    build: ./aggr-telegram-service    # Builds from Dockerfile in this specified directory
+  aggr:
+    build: ./aggr                     # Builds from Dockerfile in this specified directory
+    image: bradrut/aggr:3.3.2
     ports:
-      - "3000:3000"                   # Host:app
+      - "3000:80"                     # Host:App
   aggr-redis:
     build: ./aggr-redis
+    image: bradrut/aggr-redi:1.0.0
     ports:
       - "6379:6379"
+  aggr-telegram-service:
+    build: ./aggr-telegram-service
+    image: bradrut/aggr-telegram-service:1.0.0
+    ports:
+      - "3001:3000"
+    depends_on:
+      aggr-redis:
+        condition: service_started
+        restart: true

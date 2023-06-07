@@ -12,14 +12,14 @@ plotline(lbuyThreshold);
 plotline(lsellThreshold);
 
 if ((lbuy !== 0)) {
-  fetch('http://localhost:3000/liquidationAlerts', {
+  fetch('http://localhost:3001/liquidationAlerts', {
     method: "POST",
     body: JSON.stringify({"buyThreshold": lbuyThreshold, "sellThreshold": lsellThreshold, "liquidationValue": lbuy})
   });
 }
 
 if ((lsell !== 0)) {
-  fetch('http://localhost:3000/liquidationAlerts', {
+  fetch('http://localhost:3001/liquidationAlerts', {
     method: "POST",
     body: JSON.stringify({"buyThreshold": lbuyThreshold, "sellThreshold": lsellThreshold, "liquidationValue": -lsell})
   });
