@@ -1,6 +1,6 @@
 {
   "name": "aggr-telegram-service",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A service to process cryptocurrency liquidation notifications from AGGR and send alerts using the Telegram API.",
   "main": "src/server.ts",
   "scripts": {
