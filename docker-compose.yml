@@ -12,7 +12,7 @@ services:
       - "6379:6379"
   aggr-telegram-service:
     build: ./aggr-telegram-service
-    image: bradrut/aggr-telegram-service:1.0.0
+    image: bradrut/aggr-telegram-service:1.0.1
     ports:
       - "3001:3000"
     depends_on:
