@@ -27,17 +27,20 @@ export class LiquidationAlertsService {
    */
   public async processLiquidationAlert(buyThreshold: number, sellThreshold: number, liquidationValue: number): Promise<void> {
     this.setThresholds(buyThreshold, sellThreshold);
-    this.tryUnpauseAlerts(buyThreshold, sellThreshold, liquidationValue);
-
-    if (!liquidationValue) {
-      logger.info("Not processing notification becaues liquidationValue is zero or undefined");
-      throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Not processing notification becaues liquidationValue is zero or undefined");
-    }
 
     if (await this.liquidationValueIsDuplicate(liquidationValue)) {
       // Duplicate request; do nothing and return a 409 Conflict
       logger.info('An alert has already been processed for liquidationValue: ' + liquidationValue);
       throw new ApiError(HTTP_STATUS.CONFLICT, 'An alert has already been processed for this liquidation');
+    }
+
+    // tryUnpauseAlerts() must be called AFTER checking whether the liquidation value is a duplicate so that
+    // duplicates below the threshold don't reset pauseAlerts
+    this.tryUnpauseAlerts(buyThreshold, sellThreshold, liquidationValue);
+
+    if (!liquidationValue) {
+      logger.info("Not processing notification because liquidationValue is zero or undefined");
+      throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Not processing notification becaues liquidationValue is zero or undefined");
     }
 
     // Cache ALL nonzero liquidationValues, even if alerts are paused, so that we do not send duplicate
@@ -76,6 +79,9 @@ export class LiquidationAlertsService {
     if (this.pauseAlerts) {
       // If the current liquidationValue is below both thresholds or it's been 3mins since the last alert, unpause alerts
       let currTimeSecs = new Date().getTime() / 1000;
+
+      // TODO: Refactor into separate 'if' statements so that we can log the specific reasoning that pauseAlerts was reset
+      // TODO: Refactor to allow a negative threshold crossing immediately following a postive threshold crossing, or vice versa
       if (!this.liquidationSurpassedThreshold(buyThreshold, sellThreshold, liquidationValue) || currTimeSecs-this.pausedAt > 180) {
         logger.debug('Resetting pauseAlerts to false');
         this.pauseAlerts = false;
