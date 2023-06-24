@@ -1,10 +1,11 @@
 {
   "name": "aggr-telegram-service",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A service to process cryptocurrency liquidation notifications from AGGR and send alerts using the Telegram API.",
   "main": "src/server.ts",
   "scripts": {
     "dev": "nodemon src/server.ts",
+    "debug": "nodemon --inspect src/server.ts",
     "build": "rm -rf build/ && prettier --write src/ && tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -19,6 +20,7 @@
   },
   "homepage": "https://github.com/bradrut/aggr-telegram-service#readme",
   "dependencies": {
+    "async-mutex": "^0.4.0",
     "axios": "^1.4.0",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
